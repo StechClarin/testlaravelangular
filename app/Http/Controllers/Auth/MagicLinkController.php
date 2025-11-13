@@ -30,7 +30,7 @@ class MagicLinkController extends Controller
         $magicLink = MagicLink::create([
             'user_id' => $user->id,
             'token' => Str::random(60),
-            'expires_at' => Carbon::now()->addMinutes(15), // [cite: 11]
+            'expires_at' => Carbon::now()->addMinutes(5), // expiration: 5 minutes
         ]);
 
         // CORRECTION 2 : L'URL doit pointer vers le FRONTEND Angular (Port 4200)
