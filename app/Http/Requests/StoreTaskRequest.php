@@ -7,21 +7,19 @@ use Illuminate\Validation\Rule;
 
 class StoreTaskRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        // La permission est gérée par le Middleware/Route, ici on autorise si l'user est connecté
-        return true; 
-    }
+    public function authorize(): bool { return true; }
 
     public function rules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:255'], // [cite: 34]
+            'title' => ['required', 'string', 'max:255',Rule::unique('tasks')->where('created_by', $this->user()->id)],
             'description' => ['nullable', 'string'],
-            'status' => ['required', Rule::in(['pending', 'in_progress', 'completed'])], // [cite: 35]
-            'priority' => ['required', Rule::in(['low', 'medium', 'high'])], // [cite: 36]
-            'due_date' => ['nullable', 'date', 'after:today'], // [cite: 37]
-            'assigned_to' => ['nullable', 'integer', 'exists:users,id'], // [cite: 38]
+            // --- CORRECTION ICI ---
+            'status' => ['required', Rule::in(['todo', 'in_progress', 'done'])],
+            'priority' => ['required', Rule::in(['low', 'medium', 'high'])],
+            // --- FIN CORRECTION ---
+            'due_date' => ['required', 'date'], // Ta migration dit qu'elle est requise
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
         ];
     }
 }

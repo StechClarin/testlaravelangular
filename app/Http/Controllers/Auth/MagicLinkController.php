@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\MagicLinkMail;
 use App\Models\MagicLink;
 use App\Models\User;
+use App\Models\Role; // Import
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -17,54 +18,72 @@ class MagicLinkController extends Controller
     {
         $request->validate(['email' => 'required|email']);
 
-        // CORRECTION 1 : Ne pas mettre de 'password' car la colonne n'existe plus
+        // 1. Trouver ou Créer l'utilisateur (géré par 'email' unique)
         $user = User::firstOrCreate(
             ['email' => $request->email],
-            [
-                'name' => Str::before($request->email, '@'), // Ex: 'jean' pour 'jean@test.com'
-                // 'password' => ... SUPPRIMÉ
-            ]
+            ['name' => Str::before($request->email, '@')]
         );
 
-        // Création du lien en base
+        // --- CORRECTION DE LA LOGIQUE D'ATTRIBUTION DE RÔLE ---
+        // On vérifie si l'utilisateur a DÉJÀ des rôles.
+        // S'il n'en a aucun (count == 0), on lui donne le rôle 'user'
+        if ($user->roles()->count() == 0) {
+            $userRole = Role::where('slug', 'user')->first();
+            if ($userRole) {
+                $user->roles()->attach($userRole);
+            }
+        }
+        // (S'il a déjà un rôle, comme 'admin', on ne touche à rien)
+        // ----------------------------------------------------
+
+        // 3. Invalider les anciens liens (Sécurité)
+        MagicLink::where('user_id', $user->id)->delete();
+
+        // 4. Créer le nouveau lien
         $magicLink = MagicLink::create([
             'user_id' => $user->id,
             'token' => Str::random(60),
-            'expires_at' => Carbon::now()->addMinutes(5), // expiration: 5 minutes
+            'expires_at' => Carbon::now()->addMinutes(15),
         ]);
 
-        // CORRECTION 2 : L'URL doit pointer vers le FRONTEND Angular (Port 4200)
-        // Sinon l'utilisateur ne tombera jamais sur ta page VerifyComponent
+        // 5. Générer l'URL Frontend
         $frontendUrl = env('FRONTEND_URL', 'http://localhost:4200');
         $url = "{$frontendUrl}/auth/verify/{$magicLink->token}";
 
-        // Envoi via Queue [cite: 10]
+        // 6. Envoyer l'email
         Mail::to($user->email)->queue(new MagicLinkMail($url));
 
-        return response()->json(['message' => 'Magic link sent successfully.']);
+        // 7. Réponse JSON (pour le debug)
+        return response()->json([
+            'message' => 'Magic link sent successfully.',
+            'url' => $url 
+        ]);
     }
 
     public function verifyMagicLink($token)
     {
-        // Vérification validité et expiration [cite: 11]
+        // ... (Ta fonction verifyMagicLink est déjà parfaite et sécurisée) ...
+        // 1. Nettoyage des tokens expirés
+        MagicLink::where('expires_at', '<', Carbon::now())->delete();
+
+        // 2. Vérification du token
         $magicLink = MagicLink::where('token', $token)
                         ->where('expires_at', '>', Carbon::now())
                         ->first();
 
         if (!$magicLink) {
-            return response()->json(['message' => 'Invalid or expired magic link.'], 401);
+            return response()->json(['message' => 'Lien invalide ou expiré.'], 401);
         }
 
         $user = $magicLink->user;
 
-        // Nettoyage : le lien est à usage unique
+        // 3. Suppression du token (usage unique)
         $magicLink->delete();
 
-        // Création du token Sanctum [cite: 13]
+        // 4. Création du token d'API
         $authToken = $user->createToken('auth-token')->plainTextToken;
 
-        // CORRECTION 3 : Renvoyer l'user et ses rôles
-        // Le frontend en a besoin pour savoir "qui suis-je" tout de suite
+        // 5. Réponse
         return response()->json([
             'token' => $authToken,
             'user' => $user->load('roles.permissions') 

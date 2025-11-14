@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\MagicLinkController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\PermissionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,7 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user()->load('roles.permissions');
     });
 
-    
+    // Endpoint pour récupérer toutes les permissions
+    Route::get('/permissions', [PermissionController::class, 'index']);
+
     Route::apiResource('tasks', TaskController::class);
 
 

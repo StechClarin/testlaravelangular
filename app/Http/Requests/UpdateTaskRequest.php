@@ -17,8 +17,8 @@ class UpdateTaskRequest extends FormRequest
         return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'status' => ['sometimes', 'required', Rule::in(['pending', 'in_progress', 'completed'])],
-            'priority' => ['sometimes', 'required', Rule::in(['low', 'medium', 'high'])],
+            'status' => ['required', Rule::in(['todo', 'in_progress', 'done'])],
+            'priority' => ['required', Rule::in(['low', 'medium', 'high'])],
             'due_date' => ['nullable', 'date', 'after:today'],
             'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
         ];
